@@ -1,8 +1,10 @@
-import requests
-from bs4 import BeautifulSoup # html 파싱을 위한 라이브러리
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
+import time
 from datetime import datetime
 
-# 섹션별 ID
 SECTION_DICT = {
     "정치":"100",
     "경제":"101",
@@ -12,23 +14,22 @@ SECTION_DICT = {
     "세계":"104"
 }
 
-BASE_URL = "https://news.naver.com/main/main.naver?mode=LSD&mid=shm&sid1="
+def fetch_with_selenium(section_id):
+    url = f"https://news.naver.com/main/main.naver?mode=LSD&mid=shm&sid1={section_id}"
+    
+    options = webdriver.ChromeOptions()
+    options.add_argument("headless")
+    options.add_argument("disable-gpu")
+    
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    driver.get(url)
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0"  # 요청 차단 방지용 헤더
-}
+    time.sleep(2) # 로딩대기
 
-def fetch_headlines_by_section(section_name, section_id):
-    url = BASE_URL + section_id
-    response = requests.get(url, headers=HEADERS)
-    response.raise_for_status()  # 오류 발생 시 예외 발생 (404, 500 등)
-    soup = BeautifulSoup(response.text, "html.parser") #HTML 파싱
-
-    # 주요 헤드라인 요소 찾기
-    items = soup.select("strong.sa_text_strong")
-    headlines = [item.get_text(strip=True) for item in items[:5]]
-
-    return headlines 
+    elements = driver.find_elements(By.CSS_SELECTOR, "strong.sa_text_strong")
+    headlines = [el.text for el in elements[:5]]
+    driver.quit()
+    return headlines
 
 def save_to_file(result_dict):
     today = datetime.now().strftime("%Y%m%d")
@@ -49,7 +50,7 @@ def main():
 
     for section, sid in SECTION_DICT.items():
         print(f"[{section}]")
-        headlines = fetch_headlines_by_section(section, sid)
+        headlines = fetch_with_selenium(sid)
         result[section] = headlines
         for i, title in enumerate(headlines, 1):
             print(f" {i}.{title}")
